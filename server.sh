@@ -14,13 +14,25 @@ set -e
 oc delete is,bc,dc,service tx-server
 # New application which clones the github repository and deploy the build to EAP 7.1
 oc new-app jboss-eap-71~https://github.com/ochaloup/openshift-tx.git#eap71 --context-dir='tx-server' --name='tx-server' --labels name='tx-server'
-# The command starts clonging from github and building process with maven
+# The command starts cloning from github and building process with maven
 # to check how that goes check running builds with
 #  oc get build
 # and the logs from the building process with 
 #  oc logs build/tx-server-# -f 
 # to verify if the pod with the application is already running
 #  oc rsh `oc get pods | grep Running | awk '{print $1}'`
+
+# As the next step it's necessary to set the tx-server service to load balance the traffic with protocol remote at port :4447
+#  change the yaml configuration file to permit it
+#   oc edit svc/tx-server
+# like this
+# """
+# ports:
+#  - name: 4447-tcp
+#    port: 4447
+#    protocol: TCP
+#    targetPort: 4447
+# """
 
 # (optional) if you want to access the ejbs on tx-server directly from space out of the OpenShift
 # oc expose service tx-server

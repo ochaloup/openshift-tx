@@ -13,7 +13,7 @@ oc delete is,bc,dc,service tx-client
 # New application which clones the github repository and deploy the build to EAP 7.1
 #  passing environment variable which is attached to any starting Java program aka. to starting JBoss EAP server
 #  the value of the 'tx.server.host' is used to determine the address where client connects to
-oc new-app jboss-eap-71~https://github.com/ochaloup/openshift-tx.git#eap71 --context-dir='tx-client' --name='tx-client' --labels name='tx-client'\
+oc new-app jboss-eap-71~https://github.com/ochaloup/openshift-tx.git#eap71-remote-protocol --context-dir='tx-client' --name='tx-client' --labels name='tx-client'\
   -e JAVA_OPTS_APPEND='-Dtx.server.host=tx-server.eap-transactions.svc.cluster.local'
 # Environment variable can be added/changed later too
 # oc env dc/tx-client JAVA_OPTS_APPEND="-Dtx.server.host=tx-server.eap-transactions.svc.cluster.local"
