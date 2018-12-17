@@ -1,13 +1,13 @@
 kind: Template
 apiVersion: v1
 metadata:
-  name: statefulset-ejb3-remoting
+  name: deploymentconfig-ejb3-remoting
   annotations:
-    openshift.io/display-name: "EJB3 remoting with statefulset setup"
-    description: "How the EJB3 remoting works with statefulset"
+    openshift.io/display-name: "EJB3 remoting with deploymentconfig setup"
+    description: "How the EJB3 remoting works with deploymentconfig"
     iconClass: "icon-eap"
     tags: "eap,javaee,java,jboss"
-  message: "A new JBoss EJB3 remoting example with StatefulSets was deployed"
+  message: "A new JBoss EJB3 remoting example with DeploymentConfig was deployed"
 
 parameters:
   - name: CLIENT_APPLICATION
@@ -38,7 +38,7 @@ parameters:
     value: "1Gi"
     required: false
   - name: VOLUME_CAPACITY
-    displayName: "Capacity of the volume of the statefulset"
+    displayName: "Capacity of the shared volume of the jboss eap stuff"
     value: "1Gi"
     required: false
   - name: SOURCE_REPOSITORY_URL
@@ -49,7 +49,7 @@ parameters:
   - name: SOURCE_REPOSITORY_REF
     displayName: Git Reference
     description: Git branch/tag reference
-    value: 'eap71-statefulset'
+    value: 'eap71-statefulset-call-error'
     required: false
   - name: CUSTOM_INSTALL_DIRECTORIES
     displayName: Custom install directories (see documentation).
@@ -141,77 +141,74 @@ objects:
         name: "${CLIENT_APPLICATION}"
 
 
-  - kind: StatefulSet
-    apiVersion: apps/v1
-    metadata:
-      name: "${CLIENT_APPLICATION}"
-      application: "${CLIENT_APPLICATION}"
-    spec:
-      serviceName: "${CLIENT_APPLICATION}"
-      replicas: 1
-      selector:
-        matchLabels:
+  - kind: DeploymentConfig
+    apiVersion: v1
+      metadata:
+        name: "${CLIENT_APPLICATION}"
+        labels:
           application: "${CLIENT_APPLICATION}"
-      template:
-        metadata:
-          name: "${CLIENT_APPLICATION}"
-          labels:
+    spec:
+      strategy:
+        type: Recreate
+      triggers:
+        - type: ImageChange
+          imageChangeParams:
+            automatic: true
+            containerNames:
+              - "${CLIENT_APPLICATION}"
+            from:
+              kind: ImageStreamTag
+              name: "${CLIENT_APPLICATION}:latest"
+        - type: ConfigChange
+          replicas: 1
+          selector:
             application: "${CLIENT_APPLICATION}"
-          # https://docs.openshift.com/container-platform/3.11/dev_guide/managing_images.html#using-is-with-k8s
-          annotations:
-            alpha.image.policy.openshift.io/resolve-names: '*'
-        spec:
-          containers:
-            - name: tx-client
-              env:
-                - name: OPENSHIFT_KUBE_PING_NAMESPACE
-                  value: "${KUBE_PING_NAMESPACE}"
-                - name: OPENSHIFT_KUBE_PING_LABELS
-                  value: "application=${CLIENT_APPLICATION}"
-                - name: JAVA_OPTS_APPEND
-                  value: "-Dtx.server.host=${SERVER_APPLICATION} -Djboss.default.multicast.address=230.0.0.5" # consider removing multicast.address parameter
-                - name: SCRIPT_DEBUG
-                  value: "${SCRIPT_DEBUG}"
-              image: "${CLIENT_APPLICATION}"
-              resources:
-                limits:
-                  memory: "${MEMORY_LIMIT}"
-              ports:
-                - containerPort: 8778
-                  name: "jolokia"
-                  protocol: "TCP"
-                - containerPort: 8080
-                  name: "http"
-                  protocol: "TCP"
-                - containerPort: 8888
-                  name: "ping"
-                  protocol: "TCP"
-              volumeMounts:
-                # txn object store and ejb remoting data (WFTC-38) is stored in jboss.server.data.dir
-                - name: clientdata
-                  mountPath: "/opt/eap/standalone/data"
-              livenessProbe:
-                initialDelaySeconds: 60
-                exec:
-                  command:
-                    - "/bin/bash"
-                    - "-c"
-                    - "/opt/eap/bin/livenessProbe.sh"
-              readinessProbe:
-                initialDelaySeconds: 10
-                exec:
-                  command:
-                    - "/bin/bash"
-                    - "-c"
-                    - "/opt/eap/bin/readinessProbe.sh"
-      volumeClaimTemplates:
-        - metadata:
-            name: clientdata
-          spec:
-            accessModes: [ "ReadWriteOnce" ]
-            resources:
-              requests:
-                storage: "${VOLUME_CAPACITY}"
+          template:
+            metadata:
+              name: "${CLIENT_APPLICATION}"
+              labels:
+                application: "${CLIENT_APPLICATION}"
+            spec:
+              terminationGracePeriodSeconds: 75
+              containers:
+                - name: "${CLIENT_APPLICATION}"
+                  image: "${CLIENT_APPLICATION}"
+                  imagePullPolicy: Always
+                  resources:
+                    limits:
+                      memory: "${MEMORY_LIMIT}"
+                  livenessProbe:
+                    exec:
+                      command:
+                        - "/bin/bash"
+                        - "-c"
+                        - "/opt/eap/bin/livenessProbe.sh"
+                    initialDelaySeconds: 60
+                  readinessProbe:
+                    exec:
+                      command:
+                        - "/bin/bash"
+                        - "-c"
+                        - "/opt/eap/bin/readinessProbe.sh"
+                  ports:
+                    - name: jolokia
+                      containerPort: 8778
+                      protocol: TCP
+                    - name: http
+                      containerPort: 8080
+                      protocol: TCP
+                    - name: ping
+                      containerPort: 8888
+                      protocol: TCP
+                  env:
+                    - name: OPENSHIFT_KUBE_PING_NAMESPACE
+                      value: "${KUBE_PING_NAMESPACE}"
+                    - name: OPENSHIFT_KUBE_PING_LABELS
+                      value: "application=${CLIENT_APPLICATION}"
+                    - name: JAVA_OPTS_APPEND
+                      value: "-Dtx.server.host=${SERVER_APPLICATION} -Djboss.default.multicast.address=230.0.0.5" # consider removing multicast.address parameter
+                    - name: SCRIPT_DEBUG
+                      value: "${SCRIPT_DEBUG}"
 
   - kind: ImageStream
     apiVersion: v1
@@ -264,76 +261,74 @@ objects:
         imageChange: {}
       - type: ConfigChange
 
-
-  - kind: StatefulSet
-    apiVersion: apps/v1
-    metadata:
-      name: "${SERVER_APPLICATION}"
-      application: "${SERVER_APPLICATION}"
-    spec:
-      serviceName: "${SERVER_APPLICATION}"
-      replicas: 2
-      selector:
-        matchLabels:
+  - kind: DeploymentConfig
+    apiVersion: v1
+      metadata:
+        name: "${SERVER_APPLICATION}"
+        labels:
           application: "${SERVER_APPLICATION}"
-      template:
-        metadata:
-          name: "${SERVER_APPLICATION}"
-          labels:
+    spec:
+      strategy:
+        type: Recreate
+      triggers:
+        - type: ImageChange
+          imageChangeParams:
+            automatic: true
+            containerNames:
+              - "${SERVER_APPLICATION}"
+            from:
+              kind: ImageStreamTag
+              name: "${SERVER_APPLICATION}:latest"
+        - type: ConfigChange
+          replicas: 1
+          selector:
             application: "${SERVER_APPLICATION}"
-          annotations:
-            alpha.image.policy.openshift.io/resolve-names: '*'
-        spec:
-          containers:
-            - name: tx-server
-              env:
-                - name: OPENSHIFT_KUBE_PING_NAMESPACE
-                  value: "${KUBE_PING_NAMESPACE}"
-                - name: OPENSHIFT_KUBE_PING_LABELS
-                  value: "application=${SERVER_APPLICATION}"
-                - name: JAVA_OPTS_APPEND
-                  value: "-Djboss.default.multicast.address=230.0.0.6"
-                - name: SCRIPT_DEBUG
-                  value: "${SCRIPT_DEBUG}"
-              image: "${SERVER_APPLICATION}"
-              resources:
-                limits:
-                  memory: "${MEMORY_LIMIT}"
-              ports:
-                - containerPort: 8778
-                  name: "jolokia"
-                  protocol: "TCP"
-                - containerPort: 8080
-                  name: "http"
-                  protocol: "TCP"
-                - containerPort: 8888
-                  name: "ping"
-                  protocol: "TCP"
-              volumeMounts:
-                - name: serverdata
-                  mountPath: "/opt/eap/standalone/data"
-              livenessProbe:
-                initialDelaySeconds: 60
-                exec:
-                  command:
-                    - "/bin/bash"
-                    - "-c"
-                    - "/opt/eap/bin/livenessProbe.sh"
-              readinessProbe:
-                initialDelaySeconds: 10
-                exec:
-                  command:
-                    - "/bin/bash"
-                    - "-c"
-                    - "/opt/eap/bin/readinessProbe.sh"
-      volumeClaimTemplates:
-        - metadata:
-            name: serverdata
-          spec:
-            accessModes: [ "ReadWriteOnce" ]
-            resources:
-              requests:
-                storage: "${VOLUME_CAPACITY}"
+          template:
+            metadata:
+              name: "${SERVER_APPLICATION}"
+              labels:
+                application: "${SERVER_APPLICATION}"
+            spec:
+              terminationGracePeriodSeconds: 75
+              containers:
+                - name: "${SERVER_APPLICATION}"
+                  image: "${SERVER_APPLICATION}"
+                  imagePullPolicy: Always
+                  resources:
+                    limits:
+                      memory: "${MEMORY_LIMIT}"
+                  livenessProbe:
+                    exec:
+                      command:
+                        - "/bin/bash"
+                        - "-c"
+                        - "/opt/eap/bin/livenessProbe.sh"
+                    initialDelaySeconds: 60
+                  readinessProbe:
+                    exec:
+                      command:
+                        - "/bin/bash"
+                        - "-c"
+                        - "/opt/eap/bin/readinessProbe.sh"
+                  ports:
+                    - name: jolokia
+                      containerPort: 8778
+                      protocol: TCP
+                    - name: http
+                      containerPort: 8080
+                      protocol: TCP
+                    - name: ping
+                      containerPort: 8888
+                      protocol: TCP
+                  env:
+                    - name: OPENSHIFT_KUBE_PING_NAMESPACE
+                      value: "${KUBE_PING_NAMESPACE}"
+                    - name: OPENSHIFT_KUBE_PING_LABELS
+                      value: "application=${SERVER_APPLICATION}"
+                    - name: JAVA_OPTS_APPEND
+                      value: "-Djboss.default.multicast.address=230.0.0.5" # consider removing multicast.address parameter
+                    - name: SCRIPT_DEBUG
+                      value: "${SCRIPT_DEBUG}"
 
   - kind: ImageStream
     apiVersion: v1
@@ -386,6 +381,7 @@ objects:
         imageChange: {}
       - type: ConfigChange
 
+
   # https://docs.openshift.com/container-platform/latest/dev_guide/managing_images.html#insecure-registries
   - kind: ImageStream
     apiVersion: v1
@@ -400,9 +396,10 @@ objects:
             kind: DockerImage
             name: 'registry.access.redhat.com/jboss-eap-7/eap71-openshift:latest'
 
+
   # allow the default service account to list pods
-  - kind: Role
-    apiVersion: v1
+  - apiVersion: v1
+    kind: Role
     metadata:
       name: pods-listing
     rules:
