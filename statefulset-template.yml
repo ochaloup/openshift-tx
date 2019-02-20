@@ -1,7 +1,7 @@
 kind: Template
 apiVersion: v1
 metadata:
-  name: statefulset-ejb3-remoting
+  name: eap72-txn-ejb-remoting-statefulset
   annotations:
     openshift.io/display-name: "EJB3 remoting with statefulset setup"
     description: "How the EJB3 remoting works with statefulset"
@@ -31,7 +31,7 @@ parameters:
   - name: KUBE_PING_NAMESPACE
     displayName: Namespace for Kube ping protocol
     description: What is namespace for Kube ping protocol, usually the project name of the deployments.
-    value: 'myproject'
+    value: 'eap-transactions'
     required: false
   - name: MEMORY_LIMIT
     displayName: "Container memory limit"
@@ -49,7 +49,7 @@ parameters:
   - name: SOURCE_REPOSITORY_REF
     displayName: Git Reference
     description: Git branch/tag reference
-    value: 'eap71-statefulset'
+    value: 'eap72-statefulset'
     required: false
   - name: CUSTOM_INSTALL_DIRECTORIES
     displayName: Custom install directories (see documentation).
@@ -73,7 +73,7 @@ parameters:
   - name: IMAGE_STREAM_NAMESPACE
     displayName: ImageStream Namespace
     description: Default is without any namespace. Middleware goes usually to openshift namespace. It is where EAP image is searched at.
-    value: 'openshift'
+    value: 'eap-transactions'
     required: false
   - name: GITHUB_WEBHOOK_SECRET
     displayName: Github Webhook Secret
@@ -398,7 +398,7 @@ objects:
         - name: 'latest'
           from:
             kind: DockerImage
-            name: 'registry.access.redhat.com/jboss-eap-7/eap71-openshift:latest'
+            name: 'registry.access.redhat.com/jboss-eap-7/eap72-openshift:latest'
 
   # allow the default service account to list pods
   - kind: Role

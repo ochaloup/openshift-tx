@@ -60,12 +60,6 @@
                 <authorization>
                     <properties path="application-roles.properties" relative-to="jboss.server.config.dir"/>
                 </authorization>
-                <!-- ##SSL## -->
-            </security-realm>
-            <security-realm name="ejb-security-realm">
-                <server-identities>
-                    <secret value="dGVzdA=="/>
-                </server-identities>
             </security-realm>
         </security-realms>
         <audit-log>
@@ -420,8 +414,8 @@
         </subsystem>
         <subsystem xmlns="urn:jboss:domain:jdr:1.0"/>
         <subsystem xmlns="urn:jboss:domain:jgroups:6.0">
-            <channels default="ee-client">
-                <channel name="ee-client" stack="tcp"/>
+            <channels default="ee">
+                <channel name="ee" stack="tcp"/>
             </channels>
             <stacks>
                 <stack name="udp">
@@ -505,15 +499,6 @@
         <subsystem xmlns="urn:jboss:domain:pojo:1.0"/>
         <subsystem xmlns="urn:jboss:domain:remoting:4.0">
             <http-connector name="http-remoting-connector" connector-ref="default" security-realm="ApplicationRealm"/>
-            <outbound-connections>
-                <remote-outbound-connection name="remote-ejb-connection" outbound-socket-binding-ref="remote-ejb" username="ejb"
-                                            security-realm="ejb-security-realm" protocol="http-remoting">
-                    <properties>
-                        <property name="SASL_POLICY_NOANONYMOUS" value="false"/>
-                        <property name="SSL_ENABLED" value="false"/>
-                    </properties>
-                </remote-outbound-connection>
-            </outbound-connections>
         </subsystem>
         <subsystem xmlns="urn:jboss:domain:request-controller:1.0"/>
         <subsystem xmlns="urn:jboss:domain:resource-adapters:5.0">
@@ -620,13 +605,16 @@
         <interface name="private">
             <inet-address value="${jboss.bind.address.private:127.0.0.1}"/>
         </interface>
+        <interface name="bindall">
+            <inet-address value="0.0.0.0"/>
+        </interface>
     </interfaces>
     <socket-binding-group name="standard-sockets" default-interface="public" port-offset="0">
         <socket-binding name="management-http" interface="management" port="${jboss.management.http.port:9990}"/>
         <socket-binding name="management-https" interface="management" port="${jboss.management.https.port:9993}"/>
-        <socket-binding name="ajp" interface="public" port="${jboss.ajp.port:8009}"/>
-        <socket-binding name="http" interface="public" port="${jboss.http.port:8080}"/>
-        <socket-binding name="https" interface="public" port="${jboss.https.port:8443}"/>
+        <socket-binding name="ajp" interface="bindall" port="${jboss.ajp.port:8009}"/>
+        <socket-binding name="http" interface="bindall" port="${jboss.http.port:8080}"/>
+        <socket-binding name="https" interface="bindall" port="${jboss.https.port:8443}"/>
         <socket-binding name="jgroups-mping" interface="private" multicast-address="${jboss.default.multicast.address:230.0.0.4}" multicast-port="45700"/>
         <socket-binding name="jgroups-tcp" interface="private" port="7600"/>
         <socket-binding name="jgroups-udp" interface="private" port="55200" multicast-address="${jboss.default.multicast.address:230.0.0.4}" multicast-port="45688"/>
@@ -640,9 +628,6 @@
         <socket-binding name="txn-status-manager" port="4713"/>
         <outbound-socket-binding name="mail-smtp">
             <remote-destination host="localhost" port="25"/>
-        </outbound-socket-binding>
-        <outbound-socket-binding name="remote-ejb">
-            <remote-destination host="${tx.server.host}" port="8080"/>
         </outbound-socket-binding>
     </socket-binding-group>
 </server>

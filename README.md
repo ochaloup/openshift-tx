@@ -16,10 +16,15 @@ narayana source code is 4.17.39.Final (I think)
  #docker pull brew-pulp-docker01.web.prod.ext.phx2.redhat.com:8888/jboss-eap-7/eap71
 ```
 
-# create new project
+# Create a new project and start the Stateful set example
 
 ```
- oc new-project eap-transactions --display-name="JBoss EAP Transactional EJB"
+# new project
+oc new-project eap-transactions --display-name="JBoss EAP Transactional EJB"
+# new app created
+oc new-app --template=eap72-txn-ejb-remoting-statefulset -p IMAGE_STREAM_NAMESPACE=$(oc project -q) -p KUBE_PING_NAMESPACE=$(oc project -q)
+# invoke application
+curl -XGET "http://tx-client-`oc project -q`.`minishift ip`.nip.io/tx-client/api/ejb/stateless/arg"
 ```
 
 ## Importing EAP images
@@ -27,7 +32,8 @@ narayana source code is 4.17.39.Final (I think)
 ```
  # oc import-image jboss-eap-70 --from=registry.access.redhat.com/jboss-eap-7/eap70-openshift --confirm
  # oc import-image jboss-eap-64 --from=registry.access.redhat.com/jboss-eap-6/eap64-openshift --confirm
- oc import-image jboss-eap-71 --from=registry.access.redhat.com/jboss-eap-7/eap71-openshift --confirm
+ # oc import-image jboss-eap-71 --from=registry.access.redhat.com/jboss-eap-7/eap71-openshift --confirm
+ oc import-image jboss-eap-72 --from=registry.access.redhat.com/jboss-eap-7/eap72-openshift --confirm
 ```
 
 # create and deploy server
@@ -63,44 +69,13 @@ CLI reference: https://docs.openshift.com/enterprise/3.0/cli_reference/basic_cli
 
 # adding a user
 
-Create a user called ejbuser that will be used for securing remote EJB calls:
+Create a user called *ejb* that will be used for securing remote EJB calls:
 
 Adding a user using the add-user.sh command generates an application-users.properties file which
 needs be added to the S2I builds configuration directory.
 It also also generates the secret that that needs to be placed in the client servers config file:
 
-> To represent the user add the following to the server-identities definition &lt;secret value="dGVzdDEyMzQh" /&gt;
-
-```
-h-4.2$ pwd
-/opt/eap/standalone/configuration
-sh-4.2$ ../../bin/add-user.sh
-
-What type of user do you wish to add?
- a) Management User (mgmt-users.properties)
- b) Application User (application-users.properties)
-(a): b
-
-Enter the details of the new user to add.
-Using realm 'ApplicationRealm' as discovered from the existing property files.
-Username : ejb
-Password requirements are listed below. To modify these restrictions edit the add-user.properties configuration file.
- - The password must not be one of the following restricted values {root, admin, administrator}
- - The password must contain at least 8 characters, 1 alphabetic character(s), 1 digit(s), 1 non-alphanumeric symbol(s)
- - The password must be different from the username
-Password :
-Re-enter Password :
-What groups do you want this user to belong to? (Please enter a comma separated list, or leave blank for none)[  ]:
-About to add user 'ejb' for realm 'ApplicationRealm'
-Is this correct yes/no? yes
-Added user 'ejb' to file '/opt/eap/standalone/configuration/application-users.properties'
-Added user 'ejb' with groups  to file '/opt/eap/standalone/configuration/application-roles.properties'
-Is this new user going to be used for one AS process to connect to another AS process?
-e.g. for a slave host controller connecting to the master or for a Remoting connection for server to server EJB calls.
-yes/no? yes
-```
-
-To represent the user add the following to the server-identities definition `<secret value="dGVzdDEyMzQh" />`
+> To represent the user add the following to the server-identities definition `<secret value="dGVzdDEyMzQh" />`
 
 # to debug
 
@@ -180,6 +155,9 @@ NOTE: the same can be run for the `tx-client` service
 * setup logging for the quickstarts to show more info for all servers
   `for I in 9990 10090 10190; do ./bin/jboss-cli.sh -c --controller=localhost:$I '/subsystem=logging/logger=org.jboss.as.quickstarts:add(level=TRACE)'; done`
 * running curl on the ejb endpoint `curl -XGET localhost:8280/tx-client/api/ejb/stateless/arg` to see what the application does
+
+## Changes in standalone-openshift.xml
+
 * now about configuration. For the things to work the tx-client needs to define 'standalone.xml' remote outbound connection to one from the servers
 ```
   <security-realm name="ejb-security-realm">
@@ -222,7 +200,23 @@ and configure the `jboss-ejb-client.xml` descriptor with that
     </client-context>
 </jboss-ejb-client>
 ```
+
+### Changes made by Tomek to get it working
+
+* remove the `bindall` interface and just using the `public` one. Remove whole `<interface name="bindall">` and change the `socket-binding`
+
+```
+<socket-binding name="ajp" interface="public" port="${jboss.ajp.port:8009}"/>
+<socket-binding name="http" interface="public" port="${jboss.http.port:8080}"/>
+<socket-binding name="https" interface="public" port="${jboss.https.port:8443}"/>
+```
+
+* TODO auth...
+
+### jboss-ejb3.xml descriptor for further use for clustered apps
+
 * to setup all beans are clustered then use `jboss-ejb3.xml` descriptor
+
 ```
 <?xml version="1.0" encoding="UTF-8"?>
 <jboss:ejb-jar xmlns:jboss="http://www.jboss.com/xml/ns/javaee" xmlns="http://java.sun.com/xml/ns/javaee"
