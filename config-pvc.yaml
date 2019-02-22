@@ -1,0 +1,13 @@
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: wfly-config-claim
+  labels:
+    application: wfly-config
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+     requests:
+       storage: 10Mb
