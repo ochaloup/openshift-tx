@@ -1,8 +1,6 @@
 package org.jboss.as.quickstarts.xa.client;
 
-import javax.annotation.Resource;
 import javax.ejb.Stateless;
-import javax.transaction.UserTransaction;
 
 import org.jboss.as.quickstarts.xa.client.resources.Utils;
 import org.jboss.as.quickstarts.xa.server.StatelessRemote;
@@ -12,9 +10,6 @@ import org.jboss.logging.Logger;
 public class BeanTestToKillJVMBusiness {
     private static final Logger log = Logger.getLogger(BeanTestToKillJVMBusiness.class);
     private static final String BEAN_NAME = "StatelessBeanKillJVMBusiness";
-
-    @Resource
-    private UserTransaction userTransaction;
 
     public String call() {
         try {
