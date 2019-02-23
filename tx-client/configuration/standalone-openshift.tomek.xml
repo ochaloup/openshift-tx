@@ -530,5 +530,6 @@
         </outbound-socket-binding>
         <outbound-socket-binding name="remote-ejb">
             <remote-destination host="tx-server" port="8080"/>
+        </outbound-socket-binding>
     </socket-binding-group>
 </server>
