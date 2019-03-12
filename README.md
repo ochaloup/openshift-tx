@@ -10,9 +10,9 @@ oc create -f ./eap72-image-stream.json
 # statefulset template creation
 oc create -f ./eap72-stateful-set.json
 # startup tx-server service
-oc new-app --template=eap72-stateful-set -p APPLICATION_NAME=tx-server -p CONTEXT_DIR=tx-server
+oc new-app --template=eap72-stateful-set -p APPLICATION_NAME=tx-server -p ARTIFACT_DIR=tx-server/target
 # startup tx-client service
-oc new-app --template=eap72-stateful-set -p APPLICATION_NAME=tx-client -p CONTEXT_DIR=tx-client
+oc new-app --template=eap72-stateful-set -p APPLICATION_NAME=tx-client -p ARTIFACT_DIR=tx-client/target
 ```
 
 ## How to invoke particular "test cases"
@@ -27,18 +27,40 @@ curl -XGET "http://tx-client-`oc project -q`.`minishift ip`.nip.io/tx-client/api
 # stateless bean which crashes tx-server at the end of the business method (see StatelessBeanKillJVMBusiness.java)
 curl -XGET "http://tx-client-`oc project -q`.`minishift ip`.nip.io/tx-client/api/ejb/statless-jvm-halt-business"
 
+# stateless bean which crashes tx-server at XAResource.prepare (see StatelessBeanKillOnPrepare.java)
+curl -XGET "http://tx-client-`oc project -q`.`minishift ip`.nip.io/tx-client/api/ejb/stateless-jvm-halt-on-prepare-server"
+
 # stateless bean which crashes tx-server at XAResource.commit (see StatelessBeanKillOnCommit.java)
 curl -XGET "http://tx-client-`oc project -q`.`minishift ip`.nip.io/tx-client/api/ejb/stateless-jvm-halt-on-commit-server"
 
-# stateless bean which crashes tx-server at XAResource.prepare (see StatelessBeanKillOnPrepare.java)
-curl -XGET "http://tx-client-`oc project -q`.`minishift ip`.nip.io/tx-client/api/ejb/stateless-jvm-halt-on-prepare-server"
+# stateless bean which crashes tx-client at XAResource.prepare
+curl -XGET "http://tx-client-`oc project -q`.`minishift ip`.nip.io/tx-client/api/ejb/stateless-jvm-halt-on-prepare-client"
+
+# stateless bean which crashes tx-client at XAResource.commit
+curl -XGET "http://tx-client-`oc project -q`.`minishift ip`.nip.io/tx-client/api/ejb/stateless-jvm-halt-on-commit-client"
+
+# stateful bean without failures using `UserTransaction` to begin transaction
+curl -XGET "http://tx-client-`oc project -q`.`minishift ip`.nip.io/tx-client/api/ejb/stateful-pass"
 ```
+
+## Changes in WildFly/EAP configuration
+
+The standalone-openshift.xml configuration is based on the EAP72 configuration
+available at https://github.com/jboss-container-images/jboss-eap-modules/blob/master/jboss-eap72-openshift/added/standalone-openshift.xml.
+
+The configuration changes that are needed for the EJB remoting works correctly are:
+
+* setting up [remote outbound connection](https://access.redhat.com/documentation/en-us/red_hat_jboss_enterprise_application_platform/7.0/html/configuration_guide/configuring_remoting#remoting_remote_outbound_connection), see [standalone-openshift.xml](https://github.com/tadamski/openshift-tx/blob/e78a49b8e6e2461c7a1d61aab60aa6e3db1d1c35/tx-client/configuration/standalone-openshift.xml#L507)
+* do not use `bindall` as there is know bug in clustering/remoting, see https://issues.jboss.org/browse/JBEAP-15874
+* configuration of security needs to be defined in by property `-Dwildfly.config.url` with definition that [custom-config.xml](tx-client/configuration/custom-config.xml), setup in [OpenShift template](https://github.com/tadamski/openshift-tx/blob/e78a49b8e6e2461c7a1d61aab60aa6e3db1d1c35/eap72-stateful-set.json#L452), see https://issues.jboss.org/browse/JBEAP-15738
+* the _tx-server_ defines `client-mapping` (`<client-mapping destination-address="${jboss.node.name}.tx-server"/>`) for the http `socket-binding`, see https://issues.jboss.org/browse/JBEAP-16420
+* TODO: issue on programmatic authentication is here https://issues.jboss.org/browse/JBEAP-16149
 
 ## Notes on "How to run"
 
 * if you want to run from different git repo and branch
 ```
-oc new-app --template=eap72-stateful-set -p APPLICATION_NAME=tx-client -p CONTEXT_DIR=tx-client -p SOURCE_REPOSITORY_URL=https://github.com/ochaloup/openshift-tx.git -p SOURCE_REPOSITORY_REF=master
+oc new-app --template=eap72-stateful-set -p APPLICATION_NAME=tx-client -p ARTIFACT_DIR=tx-client/target -p SOURCE_REPOSITORY_URL=https://github.com/ochaloup/openshift-tx.git -p SOURCE_REPOSITORY_REF=master
 ```
 
 * for scaling
@@ -48,7 +70,7 @@ oc scale sts tx-server --replicas=0
 oc scale sts tx-client --replicas=0
 ```
 
-* to delete the namespace created
+* to delete the namespace/project created
 
 ```
 oc delete all --all; oc delete $(oc get pvc -o name); oc delete template eap72-stateful-set
@@ -100,14 +122,18 @@ oc create -f eap72-image-stream.json
 oc create -f eap72-stateful-set.json
 REF=tadamski-master-unchanged-my-changes
 REPO=ochaloup
-oc new-app --template=eap72-stateful-set -p APPLICATION_NAME=tx-client -p CONTEXT_DIR=tx-client -p SOURCE_REPOSITORY_URL=https://github.com/${REPO}/openshift-tx.git -p SOURCE_REPOSITORY_REF=$REF
-oc new-app --template=eap72-stateful-set -p APPLICATION_NAME=tx-server -p CONTEXT_DIR=tx-server -p SOURCE_REPOSITORY_URL=https://github.com/${REPO}/openshift-tx.git -p SOURCE_REPOSITORY_REF=$REF
+oc new-app --template=eap72-stateful-set -p APPLICATION_NAME=tx-client -p ARTIFACT_DIR=tx-client/target -p SOURCE_REPOSITORY_URL=https://github.com/${REPO}/openshift-tx.git -p SOURCE_REPOSITORY_REF=$REF
+oc new-app --template=eap72-stateful-set -p APPLICATION_NAME=tx-server -p ARTIFACT_DIR=tx-server/target -p SOURCE_REPOSITORY_URL=https://github.com/${REPO}/openshift-tx.git -p SOURCE_REPOSITORY_REF=$REF
 sleep 10; oc logs -f bc/tx-client
 ```
 
 * To build the code at the local machine and load the build to OpenShift, see
   https://docs.openshift.com/container-platform/3.6/dev_guide/dev_tutorials/binary_builds.html#binary-builds-local-code-changes.
-  When build is done (`oc get bc`) the StatefulSet does not redeploy automatically (TODO: not sure if it could be configured somewhere)
+  When build is done (`oc get bc`) the StatefulSet does not redeploy automatically (TODO: not sure if it could be configured somewhere).
+
+  The template defines the `BuildConfig` with source strategy `Git`. If the `start-build` is invoked then
+  [_it is dynamically disabled, since Binary and Git are mutually exclusive, and the data in the binary stream provided to the builder takes precedence_](https://docs.okd.io/latest/dev_guide/builds/build_inputs.html#binary-source).
+  It means that `BuildConfig` defined by template is change to be `Binary` when `start-build` is used.
 
 ```
 cd openshift-tx
@@ -121,15 +147,29 @@ oc start-build tx-server --from-dir="." --follow
   the StatefulSet. This oneliner could help with that
 
 ```
-APP=tx-client
+APP=tx-server
 oc scale sts $APP --replicas=0; while `oc get pods | grep -q $APP-0`;\
-  do echo "sleeping one second"; sleep 1; done; echo done; oc scale sts $APP --replicas=1
+  do echo "sleeping one second"; sleep 1; done; echo done;\
+  oc scale sts $APP --replicas=1
+```
+
+* If we work with the build - for example changing `.s2i/bin/assemble` script it's
+  needed to create a new build to accommodate such changes. We can delete
+  the whole build and create a new one with the `oc new-build` command.
+  We define to be `Binary` which means no build is done automatically
+  and what is about to be build is specified by `start-build`.
+
+```
+oc delete bc tx-client
+oc new-build --image-stream=eap-transactions/jboss-eap72-openshift:latest --to=tx-client:latest\
+  -eARTIFACT_DIR=tx-client/target -eMAVEN_ARGS_APPEND='-Dcom.redhat.xpaas.repo.jbossorg' --binary=true
+oc start-build tx-client --from-dir="." --follow
 ```
 
 * Forcing periodic recovery to be executed
 
 ```
-RECOVERY_FOR_POD=tx-client-0
+RECOVERY_FOR_POD=tx-server-0
 oc rsh $RECOVERY_FOR_POD java -cp /opt/eap/modules/system/layers/base/org/jboss/jts/main/narayana-jts-idlj-5.9.0.Final-redhat-00001.jar com.arjuna.ats.arjuna.tools.RecoveryMonitor -host $RECOVERY_FOR_POD -port 4712 -timeout 1800000
 ```
 
@@ -156,6 +196,14 @@ for I in `oc get pods | grep Running | grep 'tx-client' | awk '{print $1}'`; do
 done
 ```
 
+* Getting info from the JBoss CLI about Narayana object store
+
+```
+oc rsh tx-client-0 /opt/eap/bin/jboss-cli.sh -c
+/subsystem=transactions/log-store=log-store:probe()
+/subsystem=transactions/log-store=log-store:read-resource(recursive=true)
+```
+
 * Lookup for pods by selector and select their names (see http://blog.chalda.cz/2018/02/28/Querying-Open-Shift-API.html)
   `curl -k   -H "Authorization: Bearer $TOKEN"   -H 'Accept: application/json'   https://${ENDPOINT}/api/v1/namespaces/$NAMESPACE/pods?labelSelector=app%3Dtx-server | jq '.items[].metadata.name'`
 
@@ -168,6 +216,9 @@ done
 
 * RBAC permission to add the default service account to view all in the namespace
   `oc policy add-role-to-user view system:serviceaccount:$(oc project -q):default -n $(oc project -q)`
+
+* Troubles with building s2i. Run the s2i localy to see what's happening
+  `s2i build ./ registry.access.redhat.com/jboss-eap-7/eap72-openshift:latest  local/testing-tx-client`
 
 ### Appendix 3: Outbound connection standalone.xml changes
 

@@ -4,21 +4,28 @@ import javax.annotation.Resource;
 import javax.ejb.Stateless;
 import javax.transaction.TransactionManager;
 
-import org.jboss.as.quickstarts.xa.client.resources.MockXAResource;
-import org.jboss.as.quickstarts.xa.client.resources.Utils;
+import org.jboss.as.quickstarts.xa.resources.MockXAResource;
 import org.jboss.as.quickstarts.xa.server.StatelessRemote;
 import org.jboss.logging.Logger;
 
+/**
+ * <p>
+ * Bean which enlists a {@link MockXAResource} and then does the EJB remote
+ * call to the second server.
+ * <p>
+ * Because the mock resource is enlisted first the transaction contains
+ * the two resources and two-phase commit without optimization is used.
+ */
 @Stateless
-public class BeanTestServerCallerTwoPhase {
-    private static final Logger log = Logger.getLogger(BeanTestServerCallerTwoPhase.class);
+public class StatelessServerCallerTwoPhase {
+    private static final Logger log = Logger.getLogger(StatelessServerCallerTwoPhase.class);
 
     @Resource(lookup = "java:/TransactionManager")
     private TransactionManager manager;
 
     public String call(String beanName, MockXAResource.TestAction testAction) {
         try {
-            StatelessRemote bean = Utils.lookupRemoteEJBOutbound(beanName, StatelessRemote.class, null);
+            StatelessRemote bean = LookupHelper.lookupRemoteStatelessEJBOutbound(beanName, StatelessRemote.class);
             manager.getTransaction().enlistResource(new MockXAResource(testAction));
             int status = bean.call();
             log.infof("Transaction status from 'call' is %s", status);

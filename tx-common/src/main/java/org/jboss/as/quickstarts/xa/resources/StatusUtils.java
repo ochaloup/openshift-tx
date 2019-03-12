@@ -1,6 +1,10 @@
-package org.jboss.as.quickstarts.xa.server.resources;
+package org.jboss.as.quickstarts.xa.resources;
 
-public class Utils {
+public final class StatusUtils {
+    private StatusUtils() throws IllegalAccessException {
+        throw new IllegalAccessException("utility class, do not instantiate");
+    }
+
     public static String status(int status) {
         switch (status) {
             case javax.transaction.Status.STATUS_ACTIVE:
