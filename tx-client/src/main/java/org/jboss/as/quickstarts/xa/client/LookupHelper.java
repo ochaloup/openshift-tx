@@ -8,6 +8,7 @@ import javax.naming.NamingException;
 
 public class LookupHelper {
     private static final String JNDI_PKG_PREFIXES = "org.jboss.ejb.client.naming";
+    private static final String REMOTE_DEPLOYMENT_NAME = "tx-server";
 
     private LookupHelper() throws IllegalAccessException {
         throw new IllegalAccessException("Utility class, cannot be instantiated");
@@ -31,15 +32,31 @@ public class LookupHelper {
 
     @SuppressWarnings("unchecked")
     public static <T> T lookupRemoteEJBOutbound(String beanImplName, Class<T> remoteInterface, boolean isStateful, Properties ejbProperties) throws NamingException {
-        String remoteDeploymentName = System.getProperty("tx.server.host", "tx-server"); // TODO: maybe change the way
-        
         final Properties jndiProperties = new Properties();
         if(ejbProperties != null) jndiProperties.putAll(ejbProperties);
         jndiProperties.put(Context.URL_PKG_PREFIXES, JNDI_PKG_PREFIXES);
         // jndiProperties.put("jboss.naming.client.ejb.context", "true"); // ?
         final Context context = new InitialContext(jndiProperties);
         
-        return (T) context.lookup("ejb:/" + remoteDeploymentName + "/" + beanImplName + "!"
+        return (T) context.lookup("ejb:/" + REMOTE_DEPLOYMENT_NAME + "/" + beanImplName + "!"
+                + remoteInterface.getName() + (isStateful ? "?stateful" : ""));
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <T> T lookupRemoteEJBDirect(String beanImplName, Class<T> remoteInterface, boolean isStateful, Properties ejbProperties) throws NamingException {
+        String remoteServerHost = System.getProperty("tx.server.host", "tx-server"); // TODO: maybe change the way
+
+        Properties jndiProperties = new Properties();
+        jndiProperties.put(javax.naming.Context.INITIAL_CONTEXT_FACTORY, "org.wildfly.naming.client.WildFlyInitialContextFactory");
+        jndiProperties.put(javax.naming.Context.PROVIDER_URL,"http-remoting://" + remoteServerHost);
+        jndiProperties.put(Context.URL_PKG_PREFIXES, JNDI_PKG_PREFIXES);
+        // jndiProperties.put("jboss.naming.client.ejb.context", "true"); // ?
+
+        if(ejbProperties != null) jndiProperties.putAll(ejbProperties);
+
+        final Context context = new InitialContext(jndiProperties);
+
+        return (T) context.lookup("ejb:/" + REMOTE_DEPLOYMENT_NAME + "/" + beanImplName + "!"
                 + remoteInterface.getName() + (isStateful ? "?stateful" : ""));
     }
 

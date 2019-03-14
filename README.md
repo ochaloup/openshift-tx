@@ -41,6 +41,9 @@ curl -XGET "http://tx-client-`oc project -q`.`minishift ip`.nip.io/tx-client/api
 
 # stateful bean without failures using `UserTransaction` to begin transaction
 curl -XGET "http://tx-client-`oc project -q`.`minishift ip`.nip.io/tx-client/api/ejb/stateful-pass"
+
+# stateless bean without failures using, remote ejb lookup with programatic api without outbound connection
+curl -XGET "http://tx-client-`oc project -q`.`minishift ip`.nip.io/tx-client/api/ejb/stateless-programatic-pass"
 ```
 
 ## Changes in WildFly/EAP configuration
@@ -120,7 +123,7 @@ all the building. These lines could help with that
 ```
 oc create -f eap72-image-stream.json
 oc create -f eap72-stateful-set.json
-REF=tadamski-master-unchanged-my-changes
+REF=tadamski-master-unchanged
 REPO=ochaloup
 oc new-app --template=eap72-stateful-set -p APPLICATION_NAME=tx-client -p ARTIFACT_DIR=tx-client/target -p SOURCE_REPOSITORY_URL=https://github.com/${REPO}/openshift-tx.git -p SOURCE_REPOSITORY_REF=$REF
 oc new-app --template=eap72-stateful-set -p APPLICATION_NAME=tx-server -p ARTIFACT_DIR=tx-server/target -p SOURCE_REPOSITORY_URL=https://github.com/${REPO}/openshift-tx.git -p SOURCE_REPOSITORY_REF=$REF

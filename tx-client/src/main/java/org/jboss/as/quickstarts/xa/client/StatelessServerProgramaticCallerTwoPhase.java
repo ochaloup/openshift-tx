@@ -11,32 +11,26 @@ import org.jboss.logging.Logger;
 /**
  * <p>
  * Bean which enlists a {@link MockXAResource} and then does the EJB remote
- * call to the second server.
- * <p>
- * Because the mock resource is enlisted first the transaction contains
- * the two resources and two-phase commit without optimization is used.
+ * call to the second server. The EJB is lookuped with remoting properties
+ * defined in the code. Outbound connection is not used.
  */
 @Stateless
-public class StatelessServerCallerTwoPhase {
-    private static final Logger log = Logger.getLogger(StatelessServerCallerTwoPhase.class);
+public class StatelessServerProgramaticCallerTwoPhase {
+    private static final Logger log = Logger.getLogger(StatelessServerProgramaticCallerTwoPhase.class);
 
     @Resource(lookup = "java:/TransactionManager")
     private TransactionManager manager;
 
     public String call(String beanName, MockXAResource.TestAction testAction) {
         try {
-            StatelessRemote bean = LookupHelper.lookupRemoteEJBOutbound(beanName, StatelessRemote.class, false, null);
+            StatelessRemote bean = LookupHelper.lookupRemoteEJBDirect(beanName, StatelessRemote.class, false, null);
             manager.getTransaction().enlistResource(new MockXAResource(testAction));
             int status = bean.call();
-            log.infof("Transaction status from 'call' is %s", status);
+            log.infof("Transaction status from programatic 'call' is %s", status);
         } catch (Exception e) {
-            throw new RuntimeException("Error on calling bean " + beanName, e);
+            throw new RuntimeException("Error on calling bean " + beanName + " programatically looked-up", e);
         }
 
         return "SUCCESS";
-    }
-
-    public String callTestActionNone(String beanName) {
-        return this.call(beanName, MockXAResource.TestAction.NONE);
     }
 }

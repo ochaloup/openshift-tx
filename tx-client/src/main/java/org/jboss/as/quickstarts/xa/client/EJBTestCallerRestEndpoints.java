@@ -6,6 +6,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 
 import org.jboss.as.quickstarts.xa.resources.MockXAResource;
+import org.jboss.as.quickstarts.xa.resources.MockXAResource.TestAction;
 
 @Path("ejb")
 public class EJBTestCallerRestEndpoints {
@@ -68,5 +69,14 @@ public class EJBTestCallerRestEndpoints {
         // calling remote StatefulToPassBean
         StatefulBeanManagedToPass bean = LookupHelper.lookupModuleEJB(StatefulBeanManagedToPass.class);
         return bean.call();
+    }
+
+    @GET
+    @Path("stateless-programatic-pass")
+    @Produces("text/plain")
+    public String statelessProgramaticToPass() {
+        // calling remote StatelessToPassBean, look-up with programatic way (no outbound connection here)
+        StatelessServerProgramaticCallerTwoPhase bean = LookupHelper.lookupModuleEJB(StatelessServerProgramaticCallerTwoPhase.class);
+        return bean.call("StatelessToPassBean", TestAction.NONE);
     }
 }
