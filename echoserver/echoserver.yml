@@ -1,0 +1,107 @@
+kind: Template
+apiVersion: v1
+metadata:
+  name: echoserver
+  annotations:
+    openshift.io/display-name: "Python echo server"
+    tags: "python"
+
+objects:
+  - kind: Service
+    apiVersion: v1
+    metadata:
+      name: "echoserver"
+      labels:
+        application: "echoserver"
+      annotations:
+        description: "Service for client"
+    spec:
+      clusterIP: None
+      ports:
+        - name: echoserver-http
+          port: 8080
+          targetPort: 8080
+      selector:
+        application: "echoserver"
+
+  - kind: Route
+    apiVersion: v1
+    id: "echoserver-http"
+    metadata:
+      name: "echoserver"
+      labels:
+        application: "echoserver"
+      annotations:
+        description: Route for the echoserver http app.
+    spec:
+      to:
+        name: "echoserver"
+
+
+  - kind: StatefulSet
+    apiVersion: apps/v1
+    metadata:
+      name: "echoserver"
+      application: "echoserver"
+    spec:
+      serviceName: "echoserver"
+      replicas: 1
+      selector:
+        matchLabels:
+          application: "echoserver"
+      template:
+        metadata:
+          name: "echoserver"
+          labels:
+            application: "echoserver"
+          # https://docs.openshift.com/container-platform/3.11/dev_guide/managing_images.html#using-is-with-k8s
+          annotations:
+            alpha.image.policy.openshift.io/resolve-names: '*'
+        spec:
+          containers:
+            - name: echoserver
+              image: "echoserver"
+              ports:
+                - containerPort: 8080
+                  name: "http"
+                  protocol: "TCP"
+#              livenessProbe:
+#                initialDelaySeconds: 60
+#                exec:
+#                  command:
+#                    - "/bin/bash"
+#                    - "-c"
+#                    - "[ $((${HOSTNAME##*-}%2)) -eq 1 ] && echo 'not living at all' > /tmp/liveness.probe && return false"
+              readinessProbe:
+                initialDelaySeconds: 10
+                exec:
+                  command:
+                    - "/bin/bash"
+                    - "-c"
+                    - "[ $((${HOSTNAME##*-}%2)) -eq 1 ] && echo 'not ready at all' > /tmp/readiness.probe && exit 1 || exit 0"
+
+  # allow the default service account to list pods
+  - kind: Role
+    apiVersion: v1
+    metadata:
+      name: pods-listing
+    rules:
+    - apiGroups: null
+      attributeRestrictions: null
+      resources: ["pods"]
+      verbs: ["list"]
+  - apiVersion: v1
+    kind: RoleBinding
+    metadata:
+      name: claim-pod-listing-to-default
+      annotations:
+        description: "Role binding for the default service account"
+    subjects:
+    - kind: ServiceAccount
+      name: default
+      namespace: echoserver # TODO: this is probably needed but could be configured as different evn var
+    roleRef:
+      kind: Role
+      name: pods-listing
+      namespace: echoserver
+
