@@ -177,6 +177,7 @@
             "apiVersion": "v1",
             "spec": {
                 "clusterIP": "None",
+                "publishNotReadyAddresses": true,
                 "ports": [
                     {
                         "port": 8080,
@@ -193,6 +194,7 @@
                     "app": "${APPLICATION_NAME}"
                 },
                 "annotations": {
+                    "service.alpha.kubernetes.io/tolerate-unready-endpoints": "true",
                     "description": "The web server's http port."
                 }
             }
@@ -339,6 +341,7 @@
             "spec": {
                 "serviceName": "${APPLICATION_NAME}",
                 "replicas": "${REPLICAS}",
+                "podManagementPolicy": "Parallel",
                 "selector": {
                     "matchLabels": {
                         "app": "${APPLICATION_NAME}"
@@ -353,6 +356,17 @@
                     },
                     "spec": {
                         "terminationGracePeriodSeconds": 75,
+                        "initContainers": [
+							{
+								"name": "init-sleep",
+								"image": "busybox",
+								"command": [
+									"sh",
+									"-c",
+									"echo \"Waiting for fortune service to come up...\"; sleep 10;"
+								]
+							}
+						],
                         "containers": [
                             {
                                 "name": "${APPLICATION_NAME}",
