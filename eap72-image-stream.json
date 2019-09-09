@@ -43,7 +43,7 @@
                         },
                         "from": {
                             "kind": "DockerImage",
-                            "name": "registry.access.redhat.com/jboss-eap-7/eap72-openshift:latest"
+                            "name": "docker-registry.engineering.redhat.com/ochaloup/wildfly18-snapshot:190624"
                         }
                     },
                     {
@@ -64,7 +64,7 @@
                         },
                         "from": {
                             "kind": "DockerImage",
-                            "name": "registry.access.redhat.com/jboss-eap-7/eap72-openshift:1.0"
+                            "name": "docker-registry.engineering.redhat.com/ochaloup/wildfly18-snapshot:190624"
                         }
                     }
                 ]
